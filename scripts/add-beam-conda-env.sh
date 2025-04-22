@@ -9,7 +9,8 @@ conda activate apache-beam
 
 # Install packages using a pip local to the conda environment.
 conda install pip
-pip install apache-beam[gcp]
+conda install apache-beam[gcp] -y
+pip install apache-beam[gcp] -y
 
 # Adds the conda kernel.
 DL_ANACONDA_ENV_HOME="${DL_ANACONDA_HOME}/envs/apache-beam"
