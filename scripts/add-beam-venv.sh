@@ -2,5 +2,5 @@
 
 python3 -m venv .venv
 source .venv/bin/activate
-pip install pip -u
-pip install wheel apache-beam[gcp]
+pip install pip wheel setuptools build -u
+pip install apache-beam[gcp]
