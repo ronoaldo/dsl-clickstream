@@ -15,6 +15,3 @@ pip install apache-beam[gcp] -y
 # Adds the conda kernel.
 DL_ANACONDA_ENV_HOME="${DL_ANACONDA_HOME}/envs/apache-beam"
 python -m ipykernel install --prefix "${DL_ANACONDA_ENV_HOME}" --name apache-beam --display-name "Apache Beam"
-
-# Remove the default kernel
-# rm -rf "/opt/micromamba/envs/apache-beam/share/jupyter/kernels/python3"

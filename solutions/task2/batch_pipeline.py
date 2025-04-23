@@ -10,7 +10,7 @@ import google
 from google.cloud import bigquery
 
 import apache_beam as beam
-from apache_beam.options.pipeline_options import PipelineOptions, SetupOptions, GoogleCloudOptions, StandardOptions
+from apache_beam.options.pipeline_options import PipelineOptions, SetupOptions, GoogleCloudOptions
 from apache_beam.pvalue import TaggedOutput
 from apache_beam.io import ReadFromText, WriteToText
 from apache_beam.io.gcp.bigquery import WriteToBigQuery, BigQueryDisposition
@@ -131,11 +131,11 @@ class Options(PipelineOptions):
         parser.add_argument("--deadletter-bucket", default=f"gs://{DEADLETTER_BUCKET}",
                             help="The bucket where to store unparseable data and the errors")
         parser.add_argument("--force-recreate", action="store_true",
-                            help="Delete the tables before running the Pipeline in order to recreate them (i.e. when cluster columns change)")
+                            help="Delete the tables before running the Pipeline in order to recreate them.")
 
 def parse_json(line):
     return json.loads(line)
-        
+
 def new_session_key(session):
     """
     session_key calculates a unique session key from the session info.
@@ -153,12 +153,12 @@ def new_session_key(session):
 def parse_event(session_key, session_data):
     """
     parse_event will unnest the data from the raw schema into the proper event type schema.
-    
+
     It returns 'invalid', raw_data in case the event type is not a known one.
     """
     event = session_data["event"]
     details = event["details"]
-    
+
     if event["event_type"] == "page_view":
         return "page_view", {
             "session_key": session_key,
@@ -192,10 +192,10 @@ def parse_event(session_key, session_data):
 def parse_sessions(line):
     """
     parse_sessions will parse all the session data received as a JSONL string.
-    
+
     The sessions will be output into a tagged output called 'sessions'.
     Additionally, each event will be output into separeted pcollections, according to the event type.
-    
+
     Invalid events or unknown event_types will be rejected into the _invalid output pcollection.
     """
     try:
@@ -226,13 +226,13 @@ def parse_sessions(line):
 class RecreateTable(beam.PTransform):
     """
     Custom PTransform to overwrite a Bigquery table.
-    
+
     Defaults to partition by montly timestamp and no clustering.
     """
     def __init__(self, table=None, schema=None, partition_by="timestamp", partition_type="MONTH", cluster_by=None):
         self.table = table
         self.schema = schema
-        
+
         self.bq_params = {}
         if partition_by is not None:
             self.bq_params["timePartitioning"] = {"type": partition_type, "field": partition_by}
@@ -256,7 +256,7 @@ class RecreateTable(beam.PTransform):
 
 def delete_tables(table_ids=[]):
     LOG = logging.getLogger("batch_pipeline")
-    
+
     client = bigquery.Client()
     for table_id in table_ids:
         LOG.info("Removing %s ...", table_id)
@@ -264,67 +264,75 @@ def delete_tables(table_ids=[]):
             client.delete_table(table_id)
         except google.api_core.exceptions.NotFound:
             pass
-    
+
 def run_pipeline(args):
     """
     run_pipeline initializes the pipeline and executes according to the arguments provided.
     """
     LOG = logging.getLogger("batch_pipeline")
     LOG.setLevel(logging.DEBUG)
+
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-    
+
+    LOG.info("Parsing arguments ...")
     opts = Options(flags=args)
-    # Set default temp_bucket when running the job
-    opts.view_as(GoogleCloudOptions).temp_location = opts.temp_bucket + "/" + timestamp + "/"
-    # Required to avoid NameError
+    # Let's simplify the launching args and set a default temp_bucket when running the job
+    opts.view_as(GoogleCloudOptions).temp_location = f"{opts.temp_bucket}/{timestamp}/"
+
+    # This is required to avoid NameError when running on Dataflow.
     # Ref: https://cloud.google.com/dataflow/docs/guides/common-errors#name-error
     opts.view_as(SetupOptions).save_main_session = True
-    pipeline = beam.Pipeline(options=opts)
-    
-    # Read from Cloud Storage
+
+    # Also, let's prepare the deadletter timestamped folder
     dead_letter_folder = f"{opts.deadletter_bucket}/{timestamp}/"
-    LOG.info(f"Reading data from {opts.src_bucket}; writting errors into {dead_letter_folder}")
+    LOG.info("Parsed arguments %s", str(opts))
+
+    # Initializes the pipeline
+    LOG.info("Preparing the pipeline graph ...")
+    pipeline = beam.Pipeline(options=opts)
+
+    # Read from Cloud Storage
     json_lines = pipeline | "LoadJSONFiles" >> ReadFromText(opts.src_bucket + "/*.jsonl")
-    
-    # TODO:(ronoaldo) load the session data as a raw table?
+
+    # Load the raw data after parsing into a raw bucket for our data lake
     json_lines | "ParseRawAsJSON" >> beam.Map(parse_json) | RecreateTable(
         table=f"{opts.lake_dataset}.visits",
         schema=RAW,
         cluster_by=None,
         partition_by=None)
-    
-    # Parse the session data
+
+    # Parse the session data into multiple tagged outputs
     parsed = json_lines | "ParseSessionData" >> beam.ParDo(parse_sessions).with_outputs(
         "page_view", "add_item_to_cart", "purchase", "invalid", main="session"
     )
-    
-    # Dead-letter the errors to an error bucket
+
+    # Send errors to dead letter bucket
     parsed.invalid | "InvalidToDeadLetter" >> WriteToText(dead_letter_folder)
-    
+
     # Store the sessions
     parsed.session | RecreateTable(
         table=f"{opts.dw_dataset}.sessions",
         schema=SESSION,
         partition_by=None,
         cluster_by=["session_id", "user_id"])
-    
+
     # Store the events
     parsed.page_view | RecreateTable(
         table=f"{opts.dw_dataset}.pageview_events",
         schema=PAGEVIEW,
         cluster_by="session_key")
-    
     parsed.add_item_to_cart | RecreateTable(
         table=f"{opts.dw_dataset}.addtocart_events",
         schema=ADDTOCART,
         cluster_by="session_key")
-    
     parsed.purchase | RecreateTable(
         table=f"{opts.dw_dataset}.purchase_events",
         schema=PURCHASE,
         cluster_by="session_key")
-    
-    # Patch the table to update the clustering fields
+
+    # If drastic schema changes are needed, the disposition of CREATE_IF_NEEDED does not
+    # forcibly recreate the table. So if we change the clustering keys, the easier way is
+    # to delete then recreate the table.
     if opts.force_recreate == True:
         LOG.info("force_recreate: removing removing old versions of tables")
         delete_tables(table_ids=[
@@ -336,8 +344,11 @@ def run_pipeline(args):
 
     # Run the pipeline
     LOG.info("Launching the pipeline ...")
-    pipeline.run().wait_until_finish()
-    LOG.info("Execution finished")
+    result = pipeline.run()
+    result.wait_until_finish()
+    LOG.info("Execution finished.")
+    return result
 
 if __name__ == "__main__":
-    run_pipeline(sys.argv[1:])
+    result = run_pipeline(sys.argv[1:])
+    print(result)
