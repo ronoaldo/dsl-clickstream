@@ -17,8 +17,10 @@ from apache_beam.io.gcp.bigquery import WriteToBigQuery, BigQueryDisposition
 
 # Global settings
 PROJECT_ID = os.getenv("PROJECT_ID")
+
+# Bucket names derive from PROJECT_ID environment variable
 RAWDATA_BUCKET = os.getenv("RAWDATA_BUCKET", default=f"clickstream-raw-{PROJECT_ID}")
-DEADLETTER_BUCKET = os.getenv("RAWDATA_BUCKET", default=f"clickstream-deadletter-{PROJECT_ID}")
+DEADLETTER_BUCKET = os.getenv("DEADLETTER_BUCKET", default=f"clickstream-deadletter-{PROJECT_ID}")
 TEMPORARY_BUCKET = os.getenv("TEMPORARY_BUCKET", default=f"clickstream-tmp-{PROJECT_ID}")
 
 # Bigquery Schemas
