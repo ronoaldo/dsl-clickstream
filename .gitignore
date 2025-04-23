@@ -1,4 +1,6 @@
 /notebooks/challenge
+/.venv
+
+__pycache__
 .ipynb_checkpoints
 *.pyc
-/.venv/
