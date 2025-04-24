@@ -1,4 +1,4 @@
-FROM gcr.io/dataflow-templates-base/python312-template-launcher-base:latest as template_launcher
+FROM gcr.io/dataflow-templates-base/python312-template-launcher-base:latest AS template_launcher
 FROM apache/beam_python3.12_sdk:2.64.0
 
 COPY . /src/pipeline
