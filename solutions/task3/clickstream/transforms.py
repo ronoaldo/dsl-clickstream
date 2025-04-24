@@ -4,16 +4,41 @@ Module transforms contains the Apache Beam pipeline utilities to read, parse and
 
 import json
 import apache_beam as beam
+import logging
 
 from clickstream.parsers import parse_session, parse_event
 from apache_beam.pvalue import TaggedOutput
 from apache_beam.io.gcp.bigquery import WriteToBigQuery, BigQueryDisposition
 
-def ParseJSONfn(line):
+def ParseJSONFn(line):
     """
     ParseJSONfn is a small DoFn that wraps json.loads().
     """
     return json.loads(line)
+
+def ExtractPageViewsFn(session):
+    """
+    Extract page views from the raw data and yield each of the "page_view"
+    """
+    events = session["events"]
+    for l in events:
+        event = l["event"]
+        if event["event_type"] == "page_view":
+            yield "page_view"
+
+class FormatEventCountFn(beam.DoFn):
+    """
+    FormatEventCount expects elements in the format ('page_view', 1) and will format it as
+    a BigQuey row in the expected schema for the realtime monitoring.
+    """
+    def process(self, element, window=beam.DoFn.WindowParam):
+        event_type, count = element
+        window_end = window.end.to_utc_datetime().strftime("%Y-%m-%d %H:%M:%S")
+        yield {
+            "event_type": event_type,
+            "count": count,
+            "timestamp": window_end
+        }
 
 def ParseSessionsFn(line):
     """
@@ -38,6 +63,16 @@ def ParseSessionsFn(line):
             yield TaggedOutput(event_type, event)
         except Exception as e:
             yield TaggedOutput("invalid", f"error={e}, session_data={session_data}")
+
+class LogInfoFn(beam.DoFn):
+    msgformat: str
+
+    def __init__(self, msgformat="element:%s"):
+        self.msgformat = msgformat
+
+    def process(self, element):
+        log = logging.getLogger("clickstream")
+        log.info(self.msgformat, element)
 
 class RecreateTable(beam.PTransform):
     """

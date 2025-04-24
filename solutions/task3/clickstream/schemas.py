@@ -97,3 +97,11 @@ PURCHASE = {
         },
     ]
 }
+
+REALTIME_EVENTS = {
+    "fields": [
+        {"name": "event_type", "type": "STRING", "mode": "NULLABLE"},
+        {"name": "count", "type": "INTEGER", "mode": "NULLABLE"},
+        {"name": "timestamp", "type": "TIMESTAMP", "mode": "NULLABLE"},
+    ]
+}
