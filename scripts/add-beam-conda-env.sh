@@ -8,7 +8,7 @@ conda create -n apache-beam -y
 conda activate apache-beam
 
 # Install packages using a pip local to the conda environment.
-conda install pip
+conda install pip wheel setuptools build pyyaml jsonschema -y
 conda install apache-beam[gcp] -y
 pip install apache-beam[gcp] -y
 

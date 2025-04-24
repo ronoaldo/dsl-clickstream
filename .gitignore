@@ -1,7 +1,9 @@
 /notebooks/challenge
 /.venv
-
+**/dist/
+**/vendor/
 __pycache__
 .ipynb_checkpoints
 *.pyc
 *.egg-info
+.service-account.json

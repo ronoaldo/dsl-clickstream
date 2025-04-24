@@ -1,0 +1,145 @@
+openapi: 3.0.0
+info:
+  title: Visit Schema API
+  version: 1.0.0
+  description: Schema for representing a visit to a website, including page views, adding items to a cart, and purchases.
+paths: {}
+components:
+  schemas:
+    Visit:
+      type: object
+      properties:
+        session_id:
+          type: string
+          example: "SID-1234"
+          description: "A unique identifier for the user's session."
+        user_id:
+          type: string
+          example: "UID-5678"
+          description: "A unique identifier for the user visiting the website."
+        device_type:
+          type: string
+          enum: [desktop, mobile, tablet]
+          example: "desktop"
+          description: "The type of device used by the user."
+        geolocation:
+          type: string
+          example: "37.7749,-122.4194"
+          description: "The geolocation of the user in latitude,longitude format."
+        user_agent:
+          type: string
+          example: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+          description: "The user agent string of the browser/device used by the user."
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
+          description: "List of events during the user's visit."
+
+    Event:
+      type: object
+      properties:
+        event_type:
+          type: string
+          enum: [page_view, add_item_to_cart, purchase]
+          example: "page_view"
+          description: "The type of event that occurred."
+        timestamp:
+          type: string
+          format: date-time
+          example: "2023-08-10T12:34:56Z"
+          description: "The exact time when the event occurred."
+        details:
+          type: object
+          oneOf:
+            - $ref: '#/components/schemas/PageViewDetails'
+            - $ref: '#/components/schemas/AddItemToCartDetails'
+            - $ref: '#/components/schemas/PurchaseDetails'
+          description: "Specific details of the event based on its type."
+
+    PageViewDetails:
+      type: object
+      properties:
+        page_url:
+          type: string
+          example: "https://example.com/products"
+          description: "The URL of the webpage that was viewed."
+        referrer_url:
+          type: string
+          nullable: true
+          example: "https://google.com"
+          description: "The URL of the referrer page that led to this page view, or null if none."
+
+    AddItemToCartDetails:
+      type: object
+      properties:
+        product_id:
+          type: string
+          example: "HDW-001"
+          description: "The unique identifier of the product added to the cart."
+        product_name:
+          type: string
+          example: "Laptop X200"
+          description: "The name of the product added to the cart."
+        category:
+          type: string
+          enum: [hardware, software, peripherals]
+          example: "hardware"
+          description: "The category of the product added to the cart."
+        price:
+          type: number
+          format: float
+          example: 999.99
+          description: "The price of the product added to the cart."
+        quantity:
+          type: integer
+          example: 2
+          description: "The quantity of the product added to the cart."
+
+    PurchaseDetails:
+      type: object
+      properties:
+        order_id:
+          type: string
+          example: "ORD-4321"
+          description: "A unique identifier for the order."
+        amount:
+          type: number
+          format: float
+          example: 1999.98
+          description: "The total amount of the purchase."
+        currency:
+          type: string
+          example: "USD"
+          description: "The currency used for the purchase."
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PurchaseItem'
+          description: "A list of items purchased in this order."
+
+    PurchaseItem:
+      type: object
+      properties:
+        product_id:
+          type: string
+          example: "HDW-001"
+          description: "The unique identifier of the product purchased."
+        product_name:
+          type: string
+          example: "Laptop X200"
+          description: "The name of the product purchased."
+        category:
+          type: string
+          enum: [hardware, software, peripherals]
+          example: "hardware"
+          description: "The category of the product purchased."
+        price:
+          type: number
+          format: float
+          example: 999.99
+          description: "The price of the product purchased."
+        quantity:
+          type: integer
+          example: 2
+          description: "The quantity of the product purchased."

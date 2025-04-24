@@ -30,3 +30,9 @@ def create_bucket_if_needed(bucket):
         LOG.info("Bucket not found, creating bucket %s ...", bucket)
         client.create_bucket(bucket, enable_object_retention=False)
         LOG.info("Bucket %s created.", bucket)
+
+def stream_to_bigquery(dataset, table, rows):
+    client = bigquery.Client()
+    errors = client.insert_rows_json(f"{dataset}.{table}", rows, bigquery.AutoRowIDs.GENERATE_UUID)
+    if len(errors):
+        raise Exception("errors streaming to bigquery {errors}")

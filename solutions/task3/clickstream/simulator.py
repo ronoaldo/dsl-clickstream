@@ -8,6 +8,7 @@ import uuid
 import random
 import logging
 import argparse
+
 from pprint import pprint
 from faker import Faker
 from google.cloud import pubsub_v1
@@ -44,22 +45,32 @@ def url(path):
     return f"https://www.example.com{path}"
 
 class Clock(object):
+    """
+    Simple helper class to simulate events over time during a website visit.
+    """
     dt: datetime.datetime
 
     def __init__(self):
         self.dt = datetime.datetime.now()
 
     def tick(self):
+        """
+        tick advances the simulated clock between 5 and 45 seconds, then returns the time as ISO string.
+        """
         passed = datetime.timedelta(seconds=random.randint(5, 45))
         self.dt = self.dt + passed
         return self.dt.isoformat()
 
 class VisitSimulator(object):
     """
-    VisitSimulator creates a set of random visits.
+    VisitSimulator creates a set of random visits, and attempts to keep
+    the pace defined by the visits_per_minute parameter.
     """
 
     visits_per_minute: int
+    clock: Clock
+    message_count: int
+    simulation_start: datetime.datetime
 
     def __init__(self, visits_per_minute=10):
         self.visits_per_minute = visits_per_minute
@@ -67,6 +78,9 @@ class VisitSimulator(object):
         self.message_count = 0
 
     def new_pageview(self, url=url("/"), referrer=""):
+        """
+        new_pageview returns a dictionary with the fields of a page view event.
+        """
         return {
             "event": {
                 "timestamp": self.clock.tick(),
@@ -79,6 +93,9 @@ class VisitSimulator(object):
         }
 
     def new_addtocart(self, item):
+        """
+        new_addtocart returns a dictionary with the fields of an add item to cart event.
+        """
         return {
             "event": {
                 "timestamp": self.clock.tick(),
@@ -94,6 +111,9 @@ class VisitSimulator(object):
         }
 
     def new_purchase(self, added_to_cart):
+        """
+        new_purchase returns a dictionary with the fields of a purchase event.
+        """
         return {
             "event": {
                 "timestamp": self.clock.tick(),
@@ -107,10 +127,12 @@ class VisitSimulator(object):
             }
         }
 
-    def new_visit(self):
+    def new_visit(self, force_purchase=False):
         """
         new_visit creates a random visit and all nested fields.
-        It simulates a user accessing the website
+        It simulates a user accessing the website to browse some pages,
+        and later on it attempts to simulate a purchase with potentially
+        abandoned carts.
         """
         fake = Faker()
         self.clock = Clock()
@@ -136,7 +158,7 @@ class VisitSimulator(object):
 
         # Simulate adding items to cart in products page
         added_to_cart = []
-        if random.random() < 0.5:
+        if force_purchase or random.random() < 0.5:
             events.append(self.new_pageview(url("/products"), url("/")))
             num_items_to_add = random.randint(1, 3)
             for _ in range(num_items_to_add):
@@ -146,25 +168,28 @@ class VisitSimulator(object):
                 events.append(self.new_addtocart(item))
 
         # Simulate purchase
-        if random.random() < 0.5 and len(added_to_cart) > 0:
+        if force_purchase or (random.random() < 0.5 and len(added_to_cart) > 0):
             events.append(self.new_purchase(added_to_cart))
 
         visit["events"] = events
         return visit
 
     def run(self):
+        """
+        run executes the simulation in a loop, sending simulated visits to PubSub.
+        """
+        self.simulation_start = datetime.datetime.now()
+
         LOG.info("Initializing PublisherClient to PubSub...")
         publisher = pubsub_v1.PublisherClient()
         topic_path = publisher.topic_path(PROJECT_ID, TOPIC)
-        self.simulation_start = datetime.datetime.now()
 
         delay = datetime.timedelta(seconds=60 / self.visits_per_minute)
         LOG.info("Simulation setup for %d visits per minute (delay=%ds)", self.visits_per_minute, delay.total_seconds())
-        LOG.info("Sending messages ...")
         while True:
             if self.message_count % 10 == 0:
                 avg_messages = float(self.message_count) / (datetime.datetime.now() - self.simulation_start).total_seconds()
-                LOG.info("Total messages sent: %d / Troughput: %.02f messages/s", self.message_count, avg_messages)
+                LOG.info("Total messages sent: %d | Throughput: %.02f messages/s", self.message_count, avg_messages)
 
             visit = self.new_visit()
             event_types = set(e["event"]["event_type"] for e in visit["events"])
@@ -187,6 +212,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--visits-per-minute", type=int, default=10)
     parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--stdout", action="store_true")
     opts = parser.parse_args()
 
     if opts.verbose:
@@ -197,5 +223,7 @@ if __name__ == "__main__":
     LOG.info("Initializing simulator ... ")
     s = VisitSimulator(visits_per_minute=opts.visits_per_minute)
 
-    LOG.info("Simulating ...")
-    s.run()
+    if opts.stdout:
+        print(json.dumps(s.new_visit(), indent=2))
+    else:
+        s.run()
