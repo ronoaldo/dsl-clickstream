@@ -11,7 +11,7 @@ from apache_beam.options.pipeline_options import PipelineOptions, GoogleCloudOpt
 
 from clickstream.gcp import delete_tables, create_bucket_if_needed
 from clickstream.schemas import RAW, SESSION, PAGEVIEW, ADDTOCART, PURCHASE
-from clickstream.transforms import RecreateTable, ParseSessionsFn, ParseJSONfn
+from clickstream.transforms import RecreateTable, ParseSessionsFn, ParseJSONFn
 
 # Global settings
 PROJECT_ID = os.getenv("PROJECT_ID")
@@ -74,7 +74,7 @@ def run_pipeline(args):
     json_lines = pipeline | "LoadJSONFiles" >> ReadFromText(opts.src_bucket + "/*.jsonl")
 
     # Load the raw data after parsing into a raw bucket for our data lake
-    json_lines | "ParseRawAsJSON" >> beam.Map(ParseJSONfn) | RecreateTable(
+    json_lines | "ParseRawAsJSON" >> beam.Map(ParseJSONFn) | RecreateTable(
         table=f"{opts.lake_dataset}.visits",
         schema=RAW,
         cluster_by=None,

@@ -1,0 +1,31 @@
+{
+    "name": "Batch Pipeline for Clickstream",
+    "description": "Python pipeline for loading backlog data from clickstream",
+    "parameters": [
+        {
+            "name": "src-bucket",
+            "label": "Source Bucket",
+            "helpText": "The source bucket"
+        },
+        {
+            "name": "temp-bucket",
+            "label": "Temp Bucket",
+            "helpText": "The temp bucket to stage data into"
+        },
+        {
+            "name": "deadletter-bucket",
+            "label": "Deadletter Bucket",
+            "helpText": "The dead-letter bucket to place unparseable data into"
+        },
+        {
+            "name": "lake-dataset",
+            "label": "Lake Dataset",
+            "helpText": "The dataset to be used for the data lake"
+        },
+        {
+            "name": "dw-dataset",
+            "label": "Data Wharehouse Dataset",
+            "helpText": "The dataset to be used for the data wharehouse"
+        }
+    ]
+}
