@@ -89,7 +89,6 @@ part of the report to make easier to view that information.
 
 ![Dashboard Preview](../../assets/task3_dashboard.png)
 
-
 ## Pull Subscriber
 
 The pull subscriber could reuse some of the parsing and streaming insert
@@ -103,8 +102,16 @@ Without having to dive into the insanity of writing threading code in Python
 simpler, using the `subprocess` module.
 
 We packaged the code using Dockerfile to make it easier to build and test,
-but authentication would be a bit tricky to get right from inside the VM.
+and the execution using COS option in GCE was neat. Once the code was up
+and running, from the Console itself we managed to create the Instance Group
+with the Health Check with the shortcut in the VM details page.
 
-NOTE: the task to actually run the program on a cluster of VMs was left to
-the end as it is quite a chore and will not add much to the Data Engineering
-part of the things.
+## Streamming Pipeline
+
+The streamming pipeline was quite straightforward to implement after most
+of the code modularized. We implemented it using two window strategies:
+one to write to cloud storage at regular intervals, and another to do the
+expected aggregation (page views per minute).
+
+The pipeline was then used to implement a more robust solution for the
+project. The simulator worked wonders for triggering the High Volume traffic.
